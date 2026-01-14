@@ -25,6 +25,13 @@ self.addEventListener('install', (event) => {
 
 // Fetch event - serve from cache, fallback to network
 self.addEventListener('fetch', (event) => {
+  // تجاهل طلبات extensions
+  if (event.request.url.includes('castbuddy') || 
+      event.request.url.includes('chrome-extension') ||
+      event.request.url.includes('moz-extension')) {
+    return;
+  }
+  
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
@@ -43,10 +50,16 @@ self.addEventListener('fetch', (event) => {
             caches.open(CACHE_NAME)
               .then((cache) => {
                 cache.put(event.request, responseToCache);
+              })
+              .catch(() => {
+                // تجاهل أخطاء التخزين المؤقت
               });
             return response;
           }
-        );
+        ).catch(() => {
+          // في حالة فشل الطلب، حاول إرجاع صفحة افتراضية
+          return new Response('Offline', { status: 503 });
+        });
       })
   );
 });
