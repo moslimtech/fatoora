@@ -167,14 +167,42 @@
         font-size: 0.875rem;
       }
       
+      /* تحسين عرض الجدول على الموبايل - تمرير أفقي محسّن */
+      .overflow-x-auto {
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 #f1f5f9;
+      }
+      
+      .overflow-x-auto::-webkit-scrollbar {
+        height: 8px;
+      }
+      
+      .overflow-x-auto::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 4px;
+        margin: 0 8px;
+      }
+      
+      .overflow-x-auto::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+      
+      .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+      
       /* تحسين عرض الجدول على الموبايل */
       #itemsTable {
         font-size: 0.75rem;
+        min-width: 600px; /* عرض أدنى للتمرير الأفقي */
       }
       
       #itemsTable th, #itemsTable td {
         padding: 0.5rem 0.35rem !important;
         min-height: 2rem;
+        white-space: nowrap; /* منع كسر النص */
       }
       
       /* تحسين حجم المدخلات */
@@ -182,6 +210,17 @@
         font-size: 0.75rem;
         padding: 0.35rem 0.25rem;
         line-height: 1.4;
+        min-width: 60px; /* عرض أدنى للحقول */
+      }
+      
+      /* تحسين عرض الجدول - مساحة أكبر بين الخلايا */
+      #itemsTable th {
+        padding: 0.75rem 0.5rem !important;
+        font-weight: 600;
+      }
+      
+      #itemsTable td {
+        padding: 0.65rem 0.5rem !important;
       }
       
       /* تحسين حجم النصوص */
@@ -455,13 +494,15 @@
       </div>
 
       <!-- جدول الأصناف -->
-      <div class="overflow-x-auto mb-3 md:mb-4">
-        <table id="itemsTable" class="w-full text-center border table-fixed min-w-full">
-          <thead>
-            <tr id="tableHead" class="bg-gray-50"></tr>
-          </thead>
-          <tbody id="items"></tbody>
-        </table>
+      <div class="mb-3 md:mb-4">
+        <div class="overflow-x-auto -mx-2 px-2 md:mx-0 md:px-0" style="scrollbar-width: thin; scrollbar-color: #cbd5e1 #f1f5f9;">
+          <table id="itemsTable" class="w-full text-center border table-fixed" style="min-width: 600px;">
+            <thead>
+              <tr id="tableHead" class="bg-gray-50"></tr>
+            </thead>
+            <tbody id="items"></tbody>
+          </table>
+        </div>
       </div>
 
       <!-- إجمالي / ملاحظات -->
@@ -1503,17 +1544,37 @@
   <!-- Service Worker Registration -->
   <script>
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then(registration => {
-            console.log('Service Worker registered successfully:', registration.scope);
-          })
-          .catch(error => {
-            // تجاهل الأخطاء الصامتة من extensions
-            if (error.message && !error.message.includes('castbuddy')) {
-              console.warn('Service Worker registration failed:', error);
-            }
+      // تسجيل Service Worker فوراً (قبل تحميل الصفحة)
+      navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+        .then(registration => {
+          console.log('Service Worker registered successfully:', registration.scope);
+          
+          // التحقق من التحديثات
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // Service Worker جديد متاح
+                console.log('New Service Worker available');
+              }
+            });
           });
+        })
+        .catch(error => {
+          // تجاهل الأخطاء الصامتة من extensions
+          if (error.message && !error.message.includes('castbuddy')) {
+            console.warn('Service Worker registration failed:', error);
+          }
+        });
+      
+      // التحقق من حالة الاتصال
+      window.addEventListener('online', () => {
+        console.log('Online - متصل بالإنترنت');
+      });
+      
+      window.addEventListener('offline', () => {
+        console.log('Offline - لا يوجد اتصال بالإنترنت');
+        // يمكن إظهار إشعار للمستخدم
       });
     }
 
