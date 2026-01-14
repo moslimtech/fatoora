@@ -1,0 +1,1573 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2179731754865779"
+     crossorigin="anonymous"></script>
+
+  
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#3b82f6" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="فاتورة / عرض أسعار" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="description" content="تطبيق لإنشاء الفواتير وعروض الأسعار" />
+  <title>فاتورة / عرض أسعار</title>
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json" />
+  
+  <!-- Apple Touch Icons -->
+  <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
+  <!-- html2canvas & jsPDF (CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- SweetAlert2 -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    /* للطباعة: نظهر فقط معاينة المستند داخل صفحة الطباعة */
+    @media print {
+      body * { visibility: hidden; }
+      #docPreview, #docPreview * { visibility: visible; }
+      #docPreview { position: absolute; top: 0; right: 0; left: 0; }
+      .remove-row-btn { display: none !important; }
+      .hide-if-empty { display: none !important; }
+      .export-hide-if-empty { display: none !important; }
+    }
+
+    /* علامة مائية */
+    .watermark {
+      position: absolute;
+      top: 70%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-30deg);
+      font-size: 60px;
+      color: rgba(200,200,200,0.18);
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* نمنع تحديد النص (اختياري) داخل watermark */
+    .watermark::selection { background: transparent; }
+
+    /* إخفاء أزرار الحذف عند التصدير */
+    .remove-row-btn.export-hide { display: none !important; }
+    
+    /* إخفاء العناصر الفارغة عند التصدير */
+    .export-hide-if-empty { display: none !important; }
+    
+    /* تحسينات للتصدير - ضمان ظهور النص بشكل صحيح */
+    #docPreview table input[type="text"],
+    #docPreview table input[type="number"] {
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+      background: transparent !important;
+      color: #000 !important;
+      font-weight: 500 !important;
+    }
+    
+    /* ضمان ظهور النص في PDF */
+    #docPreview #itemsTable td,
+    #docPreview #itemsTable th {
+      text-align: center !important;
+      vertical-align: middle !important;
+    }
+
+    /* تحسين ظهور contenteditable عندما يكون فارغاً */
+    [contenteditable]:empty:before {
+      content: attr(data-placeholder);
+      color: #9CA3AF; /* gray-400 */
+    }
+
+    /* بسيطة: جعل inputs داخل الجدول تبدو متجانسة */
+    table input[type="text"], table input[type="number"] {
+      outline: none;
+      border: none;
+      background: transparent;
+      width: 100%;
+      padding: 0.4rem 0.25rem;
+      text-align: center;
+      color: #000;
+      font-weight: 500;
+      line-height: 1.5;
+    }
+    
+    table input[type="text"]::placeholder, table input[type="number"]::placeholder {
+      color: #9CA3AF;
+      opacity: 0.7;
+    }
+    
+    /* ضمان محاذاة النص في وسط الخلايا */
+    #itemsTable td, #itemsTable th {
+      text-align: center !important;
+      vertical-align: middle;
+      padding: 0.75rem 0.5rem !important;
+      min-height: 2.25rem;
+    }
+    
+    #itemsTable td {
+      color: #000;
+    }
+    
+    #itemsTable tr {
+      height: auto;
+    }
+    
+    #itemsTable .total {
+      font-weight: 600;
+      color: #000;
+    }
+    table input[type="number"]::-webkit-outer-spin-button,
+    table input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    /* تصميم حقل التاريخ والوقت المدمج */
+    #datetimeContainer {
+      position: relative;
+    }
+    #datetimeInput {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #ddd;
+      border-radius: 0.375rem;
+      direction: ltr;
+      text-align: right;
+      font-size: 0.875rem;
+    }
+
+    /* تحسينات PWA - منع التمرير على iOS */
+    body {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: contain;
+    }
+    
+    /* إخفاء شريط العناوين على iOS */
+    @supports (-webkit-touch-callout: none) {
+      body {
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+    }
+
+    /* تحسينات للموبايل */
+    @media (max-width: 767px) {
+      /* تصغير حجم النص على الموبايل */
+      #docPreview {
+        font-size: 0.875rem;
+      }
+      
+      /* تحسين عرض الجدول على الموبايل */
+      #itemsTable {
+        font-size: 0.75rem;
+      }
+      
+      #itemsTable th, #itemsTable td {
+        padding: 0.5rem 0.35rem !important;
+        min-height: 2rem;
+      }
+      
+      /* تحسين حجم المدخلات */
+      table input[type="text"], table input[type="number"] {
+        font-size: 0.75rem;
+        padding: 0.35rem 0.25rem;
+        line-height: 1.4;
+      }
+      
+      /* تحسين حجم النصوص */
+      #docTitle {
+        font-size: 1.25rem !important;
+      }
+      
+      #placeTitle {
+        font-size: 1rem !important;
+      }
+      
+      /* تحسين spacing */
+      #docPreview {
+        padding: 1rem !important;
+      }
+      
+      /* علامة مائية أصغر للموبايل */
+      .watermark {
+        font-size: 40px;
+      }
+    }
+
+    /* تحسينات إضافية للشاشات الصغيرة جداً */
+    @media (max-width: 480px) {
+      #docPreview {
+        font-size: 0.8rem;
+      }
+      
+      #itemsTable {
+        font-size: 0.7rem;
+      }
+      
+      #docTitle {
+        font-size: 1.1rem !important;
+      }
+      
+      .watermark {
+        font-size: 30px;
+      }
+    }
+
+    /* قائمة الأصناف المنسدلة */
+    .items-autocomplete {
+      position: relative;
+    }
+    
+    .autocomplete-dropdown {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      left: 0;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 0.375rem;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 1000;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      display: none;
+    }
+    
+    .autocomplete-item {
+      padding: 0.5rem;
+      cursor: pointer;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .autocomplete-item:hover {
+      background-color: #f3f4f6;
+    }
+    
+    .autocomplete-item:last-child {
+      border-bottom: none;
+    }
+    
+    .autocomplete-item-name {
+      font-weight: 500;
+      color: #000;
+    }
+    
+    .autocomplete-item-price {
+      color: #059669;
+      font-weight: 600;
+    }
+
+    /* نافذة إدارة الأصناف */
+    .items-manager-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .items-manager-content {
+      background: white;
+      padding: 2rem;
+      border-radius: 0.5rem;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    
+    .saved-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem;
+      border: 1px solid #e5e7eb;
+      border-radius: 0.375rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    .saved-item-info {
+      flex: 1;
+    }
+    
+    .saved-item-name {
+      font-weight: 600;
+      color: #000;
+    }
+    
+    .saved-item-price {
+      color: #059669;
+      font-weight: 500;
+    }
+
+    /* تنسيقات الفواتير المحفوظة */
+    .saved-invoice {
+      border: 1px solid #e5e7eb;
+      border-radius: 0.375rem;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+      background: #f9fafb;
+      transition: all 0.2s;
+    }
+    
+    .saved-invoice:hover {
+      background: #f3f4f6;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .saved-invoice-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 0.5rem;
+    }
+    
+    .saved-invoice-title {
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: #000;
+    }
+    
+    .saved-invoice-date {
+      color: #6b7280;
+      font-size: 0.875rem;
+    }
+    
+    .saved-invoice-info {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+      font-size: 0.875rem;
+    }
+    
+    .saved-invoice-info-item {
+      color: #374151;
+    }
+    
+    .saved-invoice-info-label {
+      font-weight: 600;
+      color: #6b7280;
+    }
+    
+    .saved-invoice-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    
+    .invoice-item-count {
+      background: #e0e7ff;
+      color: #3730a3;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 p-2 md:p-4">
+
+  <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-3 md:p-6 relative">
+    <!-- رأس الصفحة: اختيار نوع المستند + شعار فقط -->
+    <div class="mb-4 md:mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
+      <div class="flex gap-2 md:gap-3 justify-center md:justify-start">
+        <button type="button" onclick="setDocType('فاتورة')" class="px-3 py-2 md:px-4 md:py-2 bg-blue-600 text-white rounded-lg text-sm md:text-base">فاتورة</button>
+        <button type="button" onclick="setDocType('عرض سعر')" class="px-3 py-2 md:px-4 md:py-2 bg-green-600 text-white rounded-lg text-sm md:text-base">عرض سعر</button>
+      </div>
+
+      <div class="flex-1 md:flex md:justify-end">
+        <label class="block">
+          <span class="sr-only">رفع شعار المكان</span>
+          <input id="placeLogo" type="file" accept="image/*" class="border rounded-lg p-2 w-full md:w-auto text-sm">
+        </label>
+      </div>
+    </div>
+
+    <!-- معاينة المستند -->
+    <div id="docPreview" class="relative border rounded-lg p-3 md:p-6 mt-2 bg-white">
+      <div class="watermark" id="watermark"></div>
+
+      <div class="flex justify-between items-center mb-3 md:mb-4">
+        <img id="logoPreview" class="h-12 md:h-20 hidden" alt="شعار" />
+        <h1 id="docTitle" class="text-xl md:text-2xl font-bold text-center flex-1">فاتورة</h1>
+      </div>
+
+      <!-- اسم المكان -->
+      <h2 class="text-lg md:text-xl font-bold text-center mb-2">
+        <span id="placeTitle"
+             contenteditable="true"
+             data-placeholder="اسم المكان"
+             oninput="updatePreview()"></span>
+      </h2>
+
+      <!-- رقم المكان -->
+      <p id="placeNumberContainer" class="text-center text-gray-600 mb-3 md:mb-2">
+        <span id="placeNumberText"
+             contenteditable="true"
+             data-placeholder="رقم المكان (اختياري)"
+             oninput="updatePreview()"></span>
+      </p>
+
+      <!-- معلومات العميل والتاريخ والوقت - تخطيط محسن للموبايل -->
+      <div class="space-y-2 md:space-y-0 md:grid md:grid-cols-3 md:gap-2 md:items-center mb-3 md:mb-4">
+        <!-- اسم العميل - على كامل العرض في الموبايل -->
+        <div id="customerContainer" class="md:col-span-2">
+          <p class="flex flex-wrap items-center gap-1">
+            <strong class="shrink-0">اسم العميل:</strong>
+            <span id="customerText"
+                  contenteditable="true"
+                  data-placeholder="اسم العميل"
+                  class="flex-1 min-w-0"
+                  oninput="updatePreview()"></span>
+          </p>
+        </div>
+
+        <!-- التاريخ والوقت - في سطر منفصل على الموبايل -->
+        <div id="datetimeContainer" class="flex flex-col">
+          <small class="text-gray-500 text-right mb-1">التاريخ والوقت</small>
+          <input 
+            type="datetime-local" 
+            id="datetimeInput"
+            class="text-right text-sm md:text-base"
+            oninput="updatePreview()"
+            placeholder="YYYY-MM-DD HH:MM"
+          >
+        </div>
+      </div>
+
+      <!-- جدول الأصناف -->
+      <div class="overflow-x-auto mb-3 md:mb-4">
+        <table id="itemsTable" class="w-full text-center border table-fixed min-w-full">
+          <thead>
+            <tr id="tableHead" class="bg-gray-50"></tr>
+          </thead>
+          <tbody id="items"></tbody>
+        </table>
+      </div>
+
+      <!-- إجمالي / ملاحظات -->
+      <div id="totalSection" class="text-right font-bold text-lg md:text-xl">الإجمالي: <span id="total">0</span> ج.م</div>
+
+      <div id="notesSection" class="mt-3 md:mt-4 hidden">
+        <div id="generalNotes"
+             class="w-full border rounded-lg p-2 min-h-[60px] text-sm md:text-base"
+             contenteditable="true"
+             data-placeholder="ملاحظات عامة..."
+             oninput="updatePreview()"></div>
+      </div>
+    </div>
+
+    <!-- أزرار التحكم -->
+    <div class="flex flex-wrap justify-center gap-2 md:gap-4 mt-4 md:mt-6">
+      <button type="button" onclick="addRow()" class="px-3 py-2 md:px-4 md:py-2 bg-blue-500 text-white rounded-lg text-sm md:text-base">📝 إضافة صنف</button>
+      <button type="button" onclick="saveInvoice()" class="px-3 py-2 md:px-4 md:py-2 bg-indigo-500 text-white rounded-lg text-sm md:text-base">💾 حفظ الفاتورة</button>
+      <button type="button" onclick="showInvoicesManager()" class="px-3 py-2 md:px-4 md:py-2 bg-yellow-500 text-white rounded-lg text-sm md:text-base">📚 الفواتير المحفوظة</button>
+      <button type="button" onclick="showItemsManager()" class="px-3 py-2 md:px-4 md:py-2 bg-purple-500 text-white rounded-lg text-sm md:text-base">📋 إدارة الأصناف</button>
+      <button type="button" onclick="downloadPDF()" class="px-3 py-2 md:px-4 md:py-2 bg-red-600 text-white rounded-lg text-sm md:text-base">📥 تحميل PDF</button>
+      <button type="button" onclick="printDoc()" class="px-3 py-2 md:px-4 md:py-2 bg-gray-700 text-white rounded-lg text-sm md:text-base">🖨️ طباعة</button>
+      <button type="button" onclick="shareDoc()" class="px-3 py-2 md:px-4 md:py-2 bg-green-600 text-white rounded-lg text-sm md:text-base">⚡ مشاركة</button>
+    </div>
+  </div>
+
+  <!-- Bottom navigation (mobile-style) -->
+  <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur z-40 shadow-lg border-t border-gray-200">
+    <div class="max-w-4xl mx-auto flex justify-around items-center p-2">
+      <button type="button" data-href="https://moslimtech.github.io/Ban/" class="nav-link flex flex-col items-center text-center text-xs text-gray-700 hover:text-indigo-600" data-name="home" aria-label="الإعلانات العامة">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 mb-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h2v7h14v-7h2v9H3v-9zm3-8h12v6H6V5zm2 2v2h8V7H8z"/></svg>
+        <span class="block">الإعلانات</span>
+      </button>
+      <button type="button" data-href="https://wa.me/01558905023" class="nav-link flex flex-col items-center text-center text-xs text-gray-700 hover:text-indigo-600" data-name="contact" aria-label="اتصل بنا">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 mb-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M20.52 3.48A11.94 11.94 0 0012.01 0C5.39 0 .01 5.37.01 11.99c0 2.11.55 4.16 1.6 5.98L0 24l6.2-1.62a11.96 11.96 0 005.8 1.49h.01c6.62 0 12-5.38 12-12 0-3.2-1.25-6.21-3.49-8.39zM12 22.05h-.01a9.97 9.97 0 01-5.08-1.39l-.36-.21-3.68.96.98-3.59-.24-.37A9.95 9.95 0 012.03 12C2.03 6.49 6.49 2.03 12 2.03c2.66 0 5.17 1.04 7.06 2.93a9.93 9.93 0 012.93 7.04c0 5.51-4.47 10.05-9.99 10.05zM17.48 14.59c-.3-.15-1.77-.88-2.05-.98-.27-.1-.47-.15-.67.15-.2.3-.77.98-.94 1.18-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.47-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.38-.02-.53-.07-.15-.67-1.62-.92-2.21-.24-.58-.49-.5-.67-.51l-.57-.01c-.2 0-.53.08-.81.38-.27.3-1.06 1.03-1.06 2.5s1.08 2.9 1.23 3.1c.15.2 2.13 3.25 5.16 4.56.72.31 1.28.49 1.72.62.72.23 1.37.2 1.88.12.57-.08 1.77-.72 2.02-1.42.25-.7.25-1.3.17-1.42-.07-.12-.27-.2-.57-.35z"/></svg>
+        <span class="block">اتصل بنا</span>
+      </button>
+      <button type="button" data-href="https://moslimtech.github.io/Ban/dashboard/" class="nav-link flex flex-col items-center text-center text-xs text-gray-700 hover:text-indigo-600" data-name="dashboard" aria-label="دخول">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 mb-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4S14.21 4 12 4 8 5.79 8 8s1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+        <span class="block">دخول</span>
+      </button>
+    </div>
+  </nav>
+  
+  <!-- Top nav (desktop) -->
+  <nav class="hidden md:flex fixed top-0 left-0 right-0 bg-white/95 backdrop-blur z-40 shadow-sm border-b border-gray-200">
+    <div class="max-w-4xl mx-auto flex justify-between items-center p-3">
+      <div class="flex items-center gap-6">
+        <button type="button" data-href="https://moslimtech.github.io/Ban/" class="nav-link-desktop flex items-center gap-2 text-gray-700 hover:text-indigo-600 font-semibold" data-name="home">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h2v7h14v-7h2v9H3v-9zm3-8h12v6H6V5zm2 2v2h8V7H8z"/></svg>
+          الإعلانات
+        </button>
+        <button type="button" data-href="https://moslimtech.github.io/Ban/dashboard/" class="nav-link-desktop flex items-center gap-2 text-gray-700 hover:text-indigo-600 font-semibold" data-name="dashboard">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4S14.21 4 12 4 8 5.79 8 8s1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+          دخول
+        </button>
+      </div>
+      <div>
+        <button type="button" data-href="https://wa.me/01558905023" class="flex items-center gap-2 text-gray-700 hover:text-indigo-600 font-semibold" data-name="contact">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M20.52 3.48A11.94 11.94 0 0012.01 0C5.39 0 .01 5.37.01 11.99c0 2.11.55 4.16 1.6 5.98L0 24l6.2-1.62a11.96 11.96 0 005.8 1.49h.01c6.62 0 12-5.38 12-12 0-3.2-1.25-6.21-3.49-8.39zM12 22.05h-.01a9.97 9.97 0 01-5.08-1.39l-.36-.21-3.68.96.98-3.59-.24-.37A9.95 9.95 0 012.03 12C2.03 6.49 6.49 2.03 12 2.03c2.66 0 5.17 1.04 7.06 2.93a9.93 9.93 0 012.93 7.04c0 5.51-4.47 10.05-9.99 10.05z"/></svg>
+          اتصل بنا
+        </button>
+      </div>
+    </div>
+  </nav>
+  
+  <!-- Responsive spacing -->
+  <style>
+    @media (max-width: 767px) { 
+      body { padding-bottom: 72px !important; }
+    }
+    @media (min-width: 768px) { 
+      body { padding-top: 64px !important; }
+    }
+    .nav-active { color: #4f46e5 !important; }
+    .nav-active svg { color: #4f46e5 !important; }
+  </style>
+  
+  <!-- Navigation script -->
+  <script>
+    (function(){
+      const links = document.querySelectorAll('.nav-link, .nav-link-desktop');
+      const path = window.location.pathname;
+      links.forEach(el => {
+        try {
+          const href = el.getAttribute('href') || el.dataset.href;
+          if (!href) return;
+
+          if (el.dataset && el.dataset.href) {
+            el.addEventListener('click', () => { window.location.href = el.dataset.href; });
+            el.style.cursor = 'pointer';
+            el.setAttribute('role', 'button');
+          }
+
+          if (href.includes('wa.me')) {
+            el.classList.remove('nav-active');
+            return;
+          }
+          if (href.includes('/Ban/dashboard') || href.includes('/dashboard')) {
+            if (path.includes('dashboard')) el.classList.add('nav-active');
+          } else if (href.includes('/Ban/') || href.includes('/Ban')) {
+            if (path.includes('/Ban') && !path.includes('dashboard')) el.classList.add('nav-active');
+          }
+        } catch(e){ console.error(e); }
+      });
+    })();
+  </script>
+  
+  <!-- Main application script -->
+  <script>
+    const { jsPDF } = window.jspdf;
+    let docType = "فاتورة";
+    let logoData = null;
+
+    // إدارة الأصناف المحفوظة
+    function getSavedItems() {
+      const saved = localStorage.getItem('savedItems');
+      return saved ? JSON.parse(saved) : [];
+    }
+
+    function saveItems(items) {
+      localStorage.setItem('savedItems', JSON.stringify(items));
+    }
+
+    function addItemToSaved(name, price) {
+      if (!name || !price || price <= 0) return false;
+      const items = getSavedItems();
+      // التحقق من عدم وجود صنف بنفس الاسم
+      const existingIndex = items.findIndex(item => item.name.toLowerCase() === name.toLowerCase());
+      if (existingIndex >= 0) {
+        items[existingIndex].price = parseFloat(price);
+      } else {
+        items.push({ name: name.trim(), price: parseFloat(price) });
+      }
+      saveItems(items);
+      return true;
+    }
+
+    function removeItemFromSaved(name) {
+      const items = getSavedItems();
+      const filtered = items.filter(item => item.name !== name);
+      saveItems(filtered);
+    }
+
+    function showItemsManager() {
+      document.getElementById('itemsManagerModal').style.display = 'flex';
+      renderSavedItems();
+    }
+
+    function closeItemsManager() {
+      document.getElementById('itemsManagerModal').style.display = 'none';
+    }
+
+    function renderSavedItems() {
+      const items = getSavedItems();
+      const list = document.getElementById('savedItemsList');
+      if (items.length === 0) {
+        list.innerHTML = '<p class="text-gray-500 text-center">لا توجد أصناف محفوظة</p>';
+        return;
+      }
+      list.innerHTML = items.map(item => `
+        <div class="saved-item">
+          <div class="saved-item-info">
+            <div class="saved-item-name">${item.name}</div>
+            <div class="saved-item-price">${item.price} ج.م</div>
+          </div>
+          <button type="button" onclick="removeItemFromSaved('${item.name}'); renderSavedItems();" class="px-3 py-1 bg-red-500 text-white rounded text-sm">حذف</button>
+        </div>
+      `).join('');
+    }
+
+    function addNewItem() {
+      const name = document.getElementById('newItemName').value.trim();
+      const price = document.getElementById('newItemPrice').value;
+      if (addItemToSaved(name, price)) {
+        document.getElementById('newItemName').value = '';
+        document.getElementById('newItemPrice').value = '';
+        renderSavedItems();
+      } else {
+        Swal.fire({
+          icon: 'error',
+          title: 'خطأ',
+          text: 'يرجى إدخال اسم الصنف والسعر بشكل صحيح',
+          confirmButtonText: 'حسناً',
+          confirmButtonColor: '#3b82f6'
+        });
+      }
+    }
+
+    // نظام البحث التلقائي للأصناف
+    function setupAutocomplete(input, priceInput) {
+      let dropdown = null;
+      let lastSavedName = ''; // لتجنب الحفظ المتكرر
+      
+      input.addEventListener('input', function() {
+        const query = this.value.trim().toLowerCase();
+        if (query.length < 1) {
+          if (dropdown) dropdown.style.display = 'none';
+          return;
+        }
+
+        const items = getSavedItems();
+        const matches = items.filter(item => 
+          item.name.toLowerCase().includes(query)
+        ).slice(0, 5);
+
+        if (matches.length === 0) {
+          if (dropdown) dropdown.style.display = 'none';
+          return;
+        }
+
+        if (!dropdown) {
+          dropdown = document.createElement('div');
+          dropdown.className = 'autocomplete-dropdown';
+          input.parentElement.style.position = 'relative';
+          input.parentElement.appendChild(dropdown);
+        }
+
+        dropdown.innerHTML = matches.map(item => `
+          <div class="autocomplete-item" onclick="selectItem('${item.name.replace(/'/g, "\\'")}', ${item.price}, this)">
+            <span class="autocomplete-item-name">${item.name}</span>
+            <span class="autocomplete-item-price">${item.price} ج.م</span>
+          </div>
+        `).join('');
+
+        dropdown.style.display = 'block';
+      });
+
+      input.addEventListener('blur', function() {
+        setTimeout(() => {
+          if (dropdown) dropdown.style.display = 'none';
+        }, 200);
+      });
+
+      // حفظ الصنف عند الضغط على Enter
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && this.value.trim() && priceInput && priceInput.value) {
+          addItemToSaved(this.value.trim(), priceInput.value);
+        }
+      });
+
+      // حفظ الصنف تلقائياً عند إدخال سعر لصنف جديد
+      if (priceInput) {
+        priceInput.addEventListener('blur', function() {
+          const itemName = input.value.trim();
+          const itemPrice = parseFloat(this.value);
+          
+          // التحقق من أن الصنف والسعر موجودان وصحيحان
+          if (itemName && itemPrice && itemPrice > 0) {
+            // التحقق من أن الصنف ليس موجوداً بالفعل
+            const savedItems = getSavedItems();
+            const exists = savedItems.some(item => 
+              item.name.toLowerCase() === itemName.toLowerCase()
+            );
+            
+            // إذا لم يكن موجوداً ولم يتم حفظه للتو، احفظه
+            if (!exists && itemName !== lastSavedName) {
+              addItemToSaved(itemName, itemPrice);
+              lastSavedName = itemName;
+            }
+          }
+        });
+
+        // أيضاً عند تغيير السعر
+        priceInput.addEventListener('input', function() {
+          const itemName = input.value.trim();
+          const itemPrice = parseFloat(this.value);
+          
+          if (itemName && itemPrice && itemPrice > 0) {
+            const savedItems = getSavedItems();
+            const exists = savedItems.some(item => 
+              item.name.toLowerCase() === itemName.toLowerCase()
+            );
+            
+            // إذا كان الصنف موجوداً ولكن السعر تغير، قم بتحديثه
+            if (exists) {
+              const existingItem = savedItems.find(item => 
+                item.name.toLowerCase() === itemName.toLowerCase()
+              );
+              if (existingItem && existingItem.price !== itemPrice) {
+                addItemToSaved(itemName, itemPrice); // سيحدث السعر
+              }
+            }
+          }
+        });
+      }
+    }
+
+    function selectItem(name, price, element) {
+      const row = element.closest('tr');
+      const nameInput = row.querySelector('td:first-child input');
+      const priceInput = row.querySelector('td:nth-child(3) input');
+      
+      if (nameInput) nameInput.value = name;
+      if (priceInput) {
+        priceInput.value = price;
+        if (docType === 'فاتورة') {
+          updateTotal();
+        }
+      }
+      
+      const dropdown = element.closest('.autocomplete-dropdown');
+      if (dropdown) dropdown.style.display = 'none';
+      
+      updatePreview();
+    }
+
+    // إدارة الفواتير المحفوظة
+    function getSavedInvoices() {
+      const saved = localStorage.getItem('savedInvoices');
+      return saved ? JSON.parse(saved) : [];
+    }
+
+    function saveInvoices(invoices) {
+      localStorage.setItem('savedInvoices', JSON.stringify(invoices));
+    }
+
+    async function saveInvoice() {
+      // التحقق من وجود اسم العميل
+      const customerName = document.getElementById('customerText').textContent.trim();
+      let defaultInvoiceName = '';
+      
+      if (customerName && customerName !== 'اسم العميل' && customerName.length > 0) {
+        // إذا كان اسم العميل موجوداً، استخدمه كاسم افتراضي
+        defaultInvoiceName = `فاتورة ${customerName}`;
+      }
+      
+      const { value: invoiceName } = await Swal.fire({
+        title: 'حفظ الفاتورة',
+        text: 'أدخل اسم للفاتورة',
+        input: 'text',
+        inputValue: defaultInvoiceName, // استخدام اسم العميل كقيمة افتراضية
+        inputPlaceholder: 'مثل: فاتورة عميل أحمد',
+        showCancelButton: true,
+        confirmButtonText: 'حفظ',
+        cancelButtonText: 'إلغاء',
+        confirmButtonColor: '#10b981',
+        cancelButtonColor: '#6b7280',
+        inputValidator: (value) => {
+          if (!value || !value.trim()) {
+            return 'يرجى إدخال اسم للفاتورة';
+          }
+        }
+      });
+
+      if (!invoiceName || !invoiceName.trim()) {
+        return;
+      }
+
+      // جمع بيانات الفاتورة
+      const invoiceData = {
+        id: Date.now().toString(),
+        name: invoiceName.trim(),
+        date: new Date().toISOString(),
+        docType: docType,
+        placeTitle: document.getElementById('placeTitle').textContent.trim(),
+        placeNumber: document.getElementById('placeNumberText').textContent.trim(),
+        customer: document.getElementById('customerText').textContent.trim(),
+        datetime: document.getElementById('datetimeInput').value,
+        logoData: logoData,
+        items: [],
+        total: docType === 'فاتورة' ? parseFloat(document.getElementById('total').textContent) || 0 : 0,
+        notes: docType === 'عرض سعر' ? document.getElementById('generalNotes').textContent.trim() : ''
+      };
+
+      // جمع الأصناف
+      document.querySelectorAll('#items tr').forEach(tr => {
+        if (docType === 'فاتورة') {
+          const nameInput = tr.querySelector('td:first-child input');
+          const qtyInput = tr.querySelector('td:nth-child(2) input');
+          const priceInput = tr.querySelector('td:nth-child(3) input');
+          const totalCell = tr.querySelector('.total');
+          
+          if (nameInput && nameInput.value.trim()) {
+            invoiceData.items.push({
+              name: nameInput.value.trim(),
+              quantity: parseFloat(qtyInput?.value || 1),
+              price: parseFloat(priceInput?.value || 0),
+              total: parseFloat(totalCell?.textContent || 0)
+            });
+          }
+        } else {
+          const nameInput = tr.querySelector('td:first-child input');
+          const unitInput = tr.querySelector('td:nth-child(2) input');
+          const priceInput = tr.querySelector('td:nth-child(3) input');
+          const notesInput = tr.querySelector('td:nth-child(4) input');
+          
+          if (nameInput && nameInput.value.trim()) {
+            invoiceData.items.push({
+              name: nameInput.value.trim(),
+              unit: unitInput?.value.trim() || '',
+              price: parseFloat(priceInput?.value || 0),
+              notes: notesInput?.value.trim() || ''
+            });
+          }
+        }
+      });
+
+      if (invoiceData.items.length === 0) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'فاتورة فارغة',
+          text: 'يرجى إضافة أصناف أولاً',
+          confirmButtonText: 'حسناً',
+          confirmButtonColor: '#3b82f6'
+        });
+        return;
+      }
+
+      const invoices = getSavedInvoices();
+      invoices.unshift(invoiceData); // إضافة في البداية
+      saveInvoices(invoices);
+      
+      Swal.fire({
+        icon: 'success',
+        title: 'تم الحفظ',
+        text: 'تم حفظ الفاتورة بنجاح!',
+        confirmButtonText: 'حسناً',
+        confirmButtonColor: '#10b981',
+        timer: 2000,
+        timerProgressBar: true
+      });
+    }
+
+    function showInvoicesManager() {
+      document.getElementById('invoicesManagerModal').style.display = 'flex';
+      renderSavedInvoices();
+    }
+
+    function closeInvoicesManager() {
+      document.getElementById('invoicesManagerModal').style.display = 'none';
+    }
+
+    function renderSavedInvoices(filteredInvoices = null) {
+      const invoices = filteredInvoices || getSavedInvoices();
+      const list = document.getElementById('savedInvoicesList');
+      
+      if (invoices.length === 0) {
+        list.innerHTML = '<p class="text-gray-500 text-center py-4">لا توجد فواتير محفوظة</p>';
+        return;
+      }
+
+      list.innerHTML = invoices.map(invoice => {
+        const date = new Date(invoice.date);
+        const dateStr = date.toLocaleDateString('ar-EG', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        
+        return `
+          <div class="saved-invoice">
+            <div class="saved-invoice-header">
+              <div>
+                <div class="saved-invoice-title">${invoice.name}</div>
+                <div class="saved-invoice-date">${dateStr}</div>
+              </div>
+              <span class="invoice-item-count">${invoice.items.length} صنف</span>
+            </div>
+            <div class="saved-invoice-info">
+              <div class="saved-invoice-info-item">
+                <span class="saved-invoice-info-label">النوع:</span> ${invoice.docType}
+              </div>
+              ${invoice.customer ? `<div class="saved-invoice-info-item">
+                <span class="saved-invoice-info-label">العميل:</span> ${invoice.customer}
+              </div>` : ''}
+              ${invoice.placeTitle ? `<div class="saved-invoice-info-item">
+                <span class="saved-invoice-info-label">المكان:</span> ${invoice.placeTitle}
+              </div>` : ''}
+              ${invoice.total > 0 ? `<div class="saved-invoice-info-item">
+                <span class="saved-invoice-info-label">الإجمالي:</span> ${invoice.total} ج.م
+              </div>` : ''}
+            </div>
+            <div class="saved-invoice-actions">
+              <button type="button" onclick="loadInvoice('${invoice.id}')" class="px-3 py-1 bg-blue-500 text-white rounded text-sm">تحميل</button>
+              <button type="button" onclick="deleteInvoice('${invoice.id}')" class="px-3 py-1 bg-red-500 text-white rounded text-sm">حذف</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function loadInvoice(invoiceId) {
+      const invoices = getSavedInvoices();
+      const invoice = invoices.find(inv => inv.id === invoiceId);
+      
+      if (!invoice) {
+        Swal.fire({
+          icon: 'error',
+          title: 'خطأ',
+          text: 'الفاتورة غير موجودة!',
+          confirmButtonText: 'حسناً',
+          confirmButtonColor: '#3b82f6'
+        });
+        return;
+      }
+
+      // تحميل بيانات الفاتورة
+      docType = invoice.docType;
+      setDocType(docType);
+      
+      if (invoice.logoData) {
+        logoData = invoice.logoData;
+        document.getElementById('logoPreview').src = logoData;
+        document.getElementById('logoPreview').classList.remove('hidden');
+      }
+      
+      document.getElementById('placeTitle').textContent = invoice.placeTitle || '';
+      document.getElementById('placeNumberText').textContent = invoice.placeNumber || '';
+      document.getElementById('customerText').textContent = invoice.customer || '';
+      document.getElementById('datetimeInput').value = invoice.datetime || '';
+      
+      // بناء الجدول
+      buildTable();
+      
+      // ملء الأصناف
+      setTimeout(() => {
+        const rows = document.querySelectorAll('#items tr');
+        invoice.items.forEach((item, index) => {
+          if (index < rows.length) {
+            const row = rows[index];
+            if (docType === 'فاتورة') {
+              const nameInput = row.querySelector('td:first-child input');
+              const qtyInput = row.querySelector('td:nth-child(2) input');
+              const priceInput = row.querySelector('td:nth-child(3) input');
+              
+              if (nameInput) nameInput.value = item.name;
+              if (qtyInput) qtyInput.value = item.quantity;
+              if (priceInput) priceInput.value = item.price;
+            } else {
+              const nameInput = row.querySelector('td:first-child input');
+              const unitInput = row.querySelector('td:nth-child(2) input');
+              const priceInput = row.querySelector('td:nth-child(3) input');
+              const notesInput = row.querySelector('td:nth-child(4) input');
+              
+              if (nameInput) nameInput.value = item.name;
+              if (unitInput) unitInput.value = item.unit || '';
+              if (priceInput) priceInput.value = item.price;
+              if (notesInput) notesInput.value = item.notes || '';
+            }
+          } else {
+            addRow();
+            setTimeout(() => {
+              const newRow = document.querySelector('#items tr:last-child');
+              if (newRow) {
+                if (docType === 'فاتورة') {
+                  const nameInput = newRow.querySelector('td:first-child input');
+                  const qtyInput = newRow.querySelector('td:nth-child(2) input');
+                  const priceInput = newRow.querySelector('td:nth-child(3) input');
+                  
+                  if (nameInput) nameInput.value = item.name;
+                  if (qtyInput) qtyInput.value = item.quantity;
+                  if (priceInput) priceInput.value = item.price;
+                } else {
+                  const nameInput = newRow.querySelector('td:first-child input');
+                  const unitInput = newRow.querySelector('td:nth-child(2) input');
+                  const priceInput = newRow.querySelector('td:nth-child(3) input');
+                  const notesInput = newRow.querySelector('td:nth-child(4) input');
+                  
+                  if (nameInput) nameInput.value = item.name;
+                  if (unitInput) unitInput.value = item.unit || '';
+                  if (priceInput) priceInput.value = item.price;
+                  if (notesInput) notesInput.value = item.notes || '';
+                }
+              }
+            }, 50);
+          }
+        });
+        
+        if (docType === 'عرض سعر' && invoice.notes) {
+          document.getElementById('generalNotes').textContent = invoice.notes;
+        }
+        
+        updateTotal();
+        updatePreview();
+        closeInvoicesManager();
+      }, 100);
+    }
+
+    async function deleteInvoice(invoiceId) {
+      const result = await Swal.fire({
+        title: 'هل أنت متأكد؟',
+        text: 'هل أنت متأكد من حذف هذه الفاتورة؟',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'نعم، احذف',
+        cancelButtonText: 'إلغاء',
+        reverseButtons: true
+      });
+      
+      if (!result.isConfirmed) {
+        return;
+      }
+      
+      const invoices = getSavedInvoices();
+      const filtered = invoices.filter(inv => inv.id !== invoiceId);
+      saveInvoices(filtered);
+      renderSavedInvoices();
+    }
+
+    function filterInvoices() {
+      const nameQuery = document.getElementById('invoiceSearchName').value.toLowerCase();
+      const dateQuery = document.getElementById('invoiceSearchDate').value;
+      
+      const allInvoices = getSavedInvoices();
+      let filtered = allInvoices;
+      
+      if (nameQuery) {
+        filtered = filtered.filter(inv => 
+          inv.name.toLowerCase().includes(nameQuery) ||
+          (inv.customer && inv.customer.toLowerCase().includes(nameQuery)) ||
+          (inv.placeTitle && inv.placeTitle.toLowerCase().includes(nameQuery))
+        );
+      }
+      
+      if (dateQuery) {
+        filtered = filtered.filter(inv => {
+          const invDate = new Date(inv.date).toISOString().split('T')[0];
+          return invDate === dateQuery;
+        });
+      }
+      
+      renderSavedInvoices(filtered);
+    }
+
+    function clearInvoiceSearch() {
+      document.getElementById('invoiceSearchName').value = '';
+      document.getElementById('invoiceSearchDate').value = '';
+      renderSavedInvoices();
+    }
+
+    function setDocType(type) {
+      docType = type;
+      document.getElementById("docTitle").textContent = type;
+      buildTable();
+      toggleSections();
+      updatePreview();
+    }
+
+    function buildTable() {
+      const head = document.getElementById("tableHead");
+      head.innerHTML = "";
+      if (docType === "فاتورة") {
+        head.innerHTML = `
+          <th class="p-2 md:p-2.5 border text-center text-xs md:text-sm">الصنف</th>
+          <th class="p-2 md:p-2.5 border w-16 md:w-28 text-center text-xs md:text-sm">الكمية</th>
+          <th class="p-2 md:p-2.5 border w-16 md:w-28 text-center text-xs md:text-sm">السعر</th>
+          <th class="p-2 md:p-2.5 border text-center text-xs md:text-sm">الإجمالي</th>
+          <th class="remove-row-btn w-8 text-center">X</th>
+        `;
+      } else {
+        head.innerHTML = `
+          <th class="p-2 md:p-2.5 border text-center text-xs md:text-sm">الصنف</th>
+          <th class="p-2 md:p-2.5 border text-center text-xs md:text-sm">الوحدة</th>
+          <th class="p-2 md:p-2.5 border w-16 md:w-28 text-center text-xs md:text-sm">السعر</th>
+          <th class="p-2 md:p-2.5 border text-center text-xs md:text-sm">ملاحظات</th>
+          <th class="remove-row-btn w-8 text-center">X</th>
+        `;
+      }
+      document.getElementById("items").innerHTML = "";
+      addRow();
+      updateTotal();
+    }
+
+    function toggleSections() {
+      document.getElementById("totalSection").style.display = (docType === "فاتورة") ? "block" : "none";
+      document.getElementById("notesSection").style.display = (docType === "عرض سعر") ? "block" : "none";
+    }
+
+    document.getElementById("placeLogo").addEventListener("change", e => {
+      const file = e.target.files;
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = ev => {
+          logoData = ev.target.result;
+          document.getElementById("logoPreview").src = logoData;
+          document.getElementById("logoPreview").classList.remove("hidden");
+        };
+        reader.readAsDataURL(file);
+      } else {
+        logoData = null;
+        document.getElementById("logoPreview").src = '';
+        document.getElementById("logoPreview").classList.add("hidden");
+      }
+    });
+
+    window.addEventListener('load', () => {
+      const now = new Date();
+      const isoDate = now.toISOString().slice(0, 16);
+      
+      const datetimeEl = document.getElementById('datetimeInput');
+      if (!datetimeEl.value) {
+        datetimeEl.value = isoDate;
+      }
+
+      buildTable();
+      toggleSections();
+      updatePreview();
+      
+      // إعداد البحث التلقائي للصفوف الموجودة
+      setTimeout(() => {
+        document.querySelectorAll('#itemsTable td:first-child input').forEach(input => {
+          const row = input.closest('tr');
+          if (row && docType === 'فاتورة') {
+            const priceInput = row.querySelector('td:nth-child(3) input');
+            if (priceInput) {
+              setupAutocomplete(input, priceInput);
+            }
+          }
+        });
+      }, 100);
+    });
+
+    function addRow() {
+      let row = '';
+      if (docType === 'فاتورة') {
+        row = `
+          <tr class="align-middle">
+            <td class="border p-2 md:p-2.5 text-center"><input type="text" class="w-full text-center text-xs md:text-sm" placeholder="اسم الصنف" oninput="updatePreview()"></td>
+            <td class="border p-2 md:p-2.5 text-center"><input type="number" value="1" min="1" class="w-full text-center text-xs md:text-sm" oninput="updateTotal()"></td>
+            <td class="border p-2 md:p-2.5 text-center"><input type="number" value="0" min="0" class="w-full text-center text-xs md:text-sm" oninput="updateTotal()"></td>
+            <td class="border p-2 md:p-2.5 total text-center text-xs md:text-sm">0</td>
+            <td class="remove-row-btn p-2 text-center"><button type="button" onclick="this.closest('tr').remove(); updateTotal()" class="text-red-500 text-xs">X</button></td>
+          </tr>
+        `;
+      } else {
+        row = `
+          <tr class="align-middle">
+            <td class="border p-2 md:p-2.5 text-center"><input type="text" class="w-full text-center text-xs md:text-sm" placeholder="اسم الصنف" oninput="updatePreview()"></td>
+            <td class="border p-2 md:p-2.5 text-center"><input type="text" class="w-full text-center text-xs md:text-sm" placeholder="الوحدة" oninput="updatePreview()"></td>
+            <td class="border p-2 md:p-2.5 text-center"><input type="number" value="0" class="w-full text-center text-xs md:text-sm" oninput="updatePreview()"></td>
+            <td class="border p-2 md:p-2.5 text-center"><input type="text" class="w-full text-center text-xs md:text-sm" placeholder="ملاحظات" oninput="updatePreview()"></td>
+            <td class="remove-row-btn p-2 text-center"><button type="button" onclick="this.closest('tr').remove(); updatePreview()" class="text-red-500 text-xs">X</button></td>
+          </tr>
+        `;
+      }
+      document.getElementById('items').insertAdjacentHTML('beforeend', row);
+      updateTotal();
+      updatePreview();
+      
+      // إعداد البحث التلقائي للصف الجديد
+      const lastRow = document.querySelector('#items tr:last-child');
+      if (lastRow && docType === 'فاتورة') {
+        const nameInput = lastRow.querySelector('td:first-child input');
+        const priceInput = lastRow.querySelector('td:nth-child(3) input');
+        if (nameInput && priceInput) {
+          setupAutocomplete(nameInput, priceInput);
+        }
+      }
+      
+      const last = document.querySelector('#items tr:last-child input');
+      if (last) last.focus();
+    }
+
+    function updateTotal() {
+      let total = 0;
+      document.querySelectorAll('#items tr').forEach(tr => {
+        if (docType === 'فاتورة') {
+          const qtyEl = tr.querySelector('td:nth-child(2) input');
+          const priceEl = tr.querySelector('td:nth-child(3) input');
+          const qty = parseFloat(qtyEl?.value || 0) || 0;
+          const price = parseFloat(priceEl?.value || 0) || 0;
+          const sum = +(qty * price).toFixed(2);
+          const totalCell = tr.querySelector('.total');
+          if (totalCell) totalCell.textContent = sum;
+          total += sum;
+        }
+      });
+      document.getElementById('total').textContent = Number.isInteger(total) ? total : total.toFixed(2);
+      updatePreview();
+    }
+
+    function updatePreview() {
+      const placeName = document.getElementById('placeTitle').textContent.trim();
+      const placeNumber = document.getElementById('placeNumberText').textContent.trim();
+      const customer = document.getElementById('customerText').textContent.trim();
+      const datetime = document.getElementById('datetimeInput').value;
+
+      if (logoData) {
+        document.getElementById('logoPreview').src = logoData;
+        document.getElementById('logoPreview').classList.remove('hidden');
+      } else {
+        document.getElementById('logoPreview').src = '';
+        document.getElementById('logoPreview').classList.add('hidden');
+      }
+
+      document.getElementById('watermark').textContent = placeName || '';
+
+      if (docType === 'عرض سعر') {
+        const notes = document.getElementById('generalNotes').textContent.trim();
+      }
+    }
+
+    function hideEmptyElements() {
+      const placeName = document.getElementById('placeTitle').textContent.trim();
+      if (!placeName) {
+        document.getElementById('placeTitle').parentElement.classList.add('export-hide-if-empty');
+      } else {
+        document.getElementById('placeTitle').parentElement.classList.remove('export-hide-if-empty');
+      }
+
+      const placeNumber = document.getElementById('placeNumberText').textContent.trim();
+      if (!placeNumber) {
+        document.getElementById('placeNumberContainer').classList.add('export-hide-if-empty');
+      } else {
+        document.getElementById('placeNumberContainer').classList.remove('export-hide-if-empty');
+      }
+
+      const customer = document.getElementById('customerText').textContent.trim();
+      if (!customer || customer === '-') {
+        document.getElementById('customerContainer').classList.add('export-hide-if-empty');
+      } else {
+        document.getElementById('customerContainer').classList.remove('export-hide-if-empty');
+      }
+
+      const datetime = document.getElementById('datetimeInput').value;
+      if (!datetime) {
+        document.getElementById('datetimeContainer').classList.add('export-hide-if-empty');
+      } else {
+        document.getElementById('datetimeContainer').classList.remove('export-hide-if-empty');
+      }
+
+      if (docType === 'عرض سعر') {
+        const notes = document.getElementById('generalNotes').textContent.trim();
+        if (!notes) {
+          document.getElementById('notesSection').classList.add('export-hide-if-empty');
+        } else {
+          document.getElementById('notesSection').classList.remove('export-hide-if-empty');
+        }
+      }
+    }
+
+    function showAllElements() {
+      document.querySelectorAll('.export-hide-if-empty').forEach(el => {
+        el.classList.remove('export-hide-if-empty');
+      });
+    }
+
+    function downloadPDF() {
+      const docElement = document.getElementById('docPreview');
+      docElement.querySelectorAll('.remove-row-btn').forEach(btn => btn.classList.add('export-hide'));
+      hideEmptyElements();
+
+      // استبدال الـ inputs بنصوص قبل التصدير
+      const inputs = docElement.querySelectorAll('table input');
+      const inputValues = [];
+      inputs.forEach((input, index) => {
+        inputValues[index] = input.value;
+        if (input.value) {
+          const span = document.createElement('span');
+          span.textContent = input.value;
+          span.className = 'export-text-display';
+          span.style.cssText = 'display: block; width: 100%; text-align: center; color: #000; font-weight: 500; padding: 0.4rem 0.25rem; line-height: 1.5;';
+          input.parentNode.insertBefore(span, input);
+          input.style.display = 'none';
+        }
+      });
+
+      html2canvas(docElement, { 
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      }).then(canvas => {
+        // استعادة الـ inputs بعد التصدير
+        inputs.forEach((input, index) => {
+          const span = input.parentNode.querySelector('.export-text-display');
+          if (span) {
+            span.remove();
+          }
+          input.style.display = '';
+          input.value = inputValues[index];
+        });
+        docElement.querySelectorAll('.remove-row-btn').forEach(btn => btn.classList.remove('export-hide'));
+        showAllElements();
+
+        const imgData = canvas.toDataURL('image/jpeg', 1.0);
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = 210;
+        const pageHeight = 297;
+        const imgProps = pdf.getImageProperties(imgData);
+        let pdfWidth = pageWidth - 20;
+        let pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+        if (pdfHeight > pageHeight - 20) {
+          pdfHeight = pageHeight - 20;
+          pdfWidth = (imgProps.width * pdfHeight) / imgProps.height;
+        }
+        const x = (pageWidth - pdfWidth) / 2;
+        pdf.addImage(imgData, 'JPEG', x, 10, pdfWidth, pdfHeight, '', 'FAST');
+        pdf.save((docType || 'document') + '.pdf');
+      }).catch(err => {
+        docElement.querySelectorAll('.remove-row-btn').forEach(btn => btn.classList.remove('export-hide'));
+        showAllElements();
+        Swal.fire({
+          icon: 'error',
+          title: 'خطأ',
+          text: 'حدث خطأ أثناء إنشاء PDF: ' + err.message,
+          confirmButtonText: 'حسناً',
+          confirmButtonColor: '#3b82f6'
+        });
+      });
+    }
+
+    async function shareDoc() {
+      const docElement = document.getElementById('docPreview');
+      docElement.querySelectorAll('.remove-row-btn').forEach(btn => btn.classList.add('export-hide'));
+      hideEmptyElements();
+      
+      // استبدال الـ inputs بنصوص قبل التصدير
+      const inputs = docElement.querySelectorAll('table input');
+      const inputValues = [];
+      inputs.forEach((input, index) => {
+        inputValues[index] = input.value;
+        if (input.value) {
+          const span = document.createElement('span');
+          span.textContent = input.value;
+          span.className = 'export-text-display';
+          span.style.cssText = 'display: block; width: 100%; text-align: center; color: #000; font-weight: 500; padding: 0.4rem 0.25rem; line-height: 1.5;';
+          input.parentNode.insertBefore(span, input);
+          input.style.display = 'none';
+        }
+      });
+
+      try {
+        const canvas = await html2canvas(docElement, { 
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff'
+        });
+        
+        // استعادة الـ inputs بعد التصدير
+        inputs.forEach((input, index) => {
+          const span = input.parentNode.querySelector('.export-text-display');
+          if (span) {
+            span.remove();
+          }
+          input.style.display = '';
+          input.value = inputValues[index];
+        });
+        docElement.querySelectorAll('.remove-row-btn').forEach(btn => btn.classList.remove('export-hide'));
+        showAllElements();
+        
+        const imgData = canvas.toDataURL('image/jpeg', 1.0);
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = 210;
+        const pageHeight = 297;
+        const imgProps = pdf.getImageProperties(imgData);
+        let pdfWidth = pageWidth - 20;
+        let pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+        if (pdfHeight > pageHeight - 20) {
+          pdfHeight = pageHeight - 20;
+          pdfWidth = (imgProps.width * pdfHeight) / imgProps.height;
+        }
+        const x = (pageWidth - pdfWidth) / 2;
+        pdf.addImage(imgData, 'JPEG', x, 10, pdfWidth, pdfHeight, '', 'FAST');
+
+        const blob = pdf.output('blob');
+        const file = new File([blob], (docType || 'document') + '.pdf', { type: 'application/pdf' });
+
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], title: docType, text: 'إليك نسخة من ' + docType });
+          } catch (err) {
+            Swal.fire({
+              icon: 'info',
+              title: 'تم الإلغاء',
+              text: 'تم إلغاء المشاركة',
+              confirmButtonText: 'حسناً',
+              confirmButtonColor: '#3b82f6',
+              timer: 2000,
+              timerProgressBar: true
+            });
+          }
+        } else {
+          pdf.save((docType || 'document') + '.pdf');
+          Swal.fire({
+            icon: 'info',
+            title: 'تنزيل الملف',
+            text: 'المشاركة غير مدعومة على هذا الجهاز — تم تنزيل الملف بدلاً من المشاركة',
+            confirmButtonText: 'حسناً',
+            confirmButtonColor: '#3b82f6'
+          });
+        }
+      } catch (err) {
+        docElement.querySelectorAll('.remove-row-btn').forEach(btn => btn.classList.remove('export-hide'));
+        showAllElements();
+        Swal.fire({
+          icon: 'error',
+          title: 'خطأ',
+          text: 'حدث خطأ أثناء المشاركة: ' + err.message,
+          confirmButtonText: 'حسناً',
+          confirmButtonColor: '#3b82f6'
+        });
+      }
+    }
+
+    function printDoc() {
+      hideEmptyElements();
+      document.querySelectorAll('.export-hide-if-empty').forEach(el => {
+        el.classList.add('hide-if-empty');
+      });
+      
+      window.print();
+      
+      setTimeout(() => {
+        showAllElements();
+        document.querySelectorAll('.hide-if-empty').forEach(el => {
+          el.classList.remove('hide-if-empty');
+        });
+      }, 1000);
+    }
+
+  </script>
+
+  <!-- نافذة إدارة الأصناف -->
+  <div id="itemsManagerModal" class="items-manager-modal">
+    <div class="items-manager-content">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold">إدارة الأصناف المحفوظة</h2>
+        <button type="button" onclick="closeItemsManager()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+      </div>
+      <div id="savedItemsList" class="mb-4"></div>
+      <div class="flex gap-2">
+        <input type="text" id="newItemName" placeholder="اسم الصنف" class="flex-1 border rounded-lg p-2">
+        <input type="number" id="newItemPrice" placeholder="السعر" min="0" step="0.01" class="w-32 border rounded-lg p-2">
+        <button type="button" onclick="addNewItem()" class="px-4 py-2 bg-blue-500 text-white rounded-lg">إضافة</button>
+      </div>
+      <div class="mt-4 text-center">
+        <button type="button" onclick="closeItemsManager()" class="px-4 py-2 bg-gray-500 text-white rounded-lg">إغلاق</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(registration => {
+            console.log('Service Worker registered successfully:', registration.scope);
+          })
+          .catch(error => {
+            // تجاهل الأخطاء الصامتة من extensions
+            if (error.message && !error.message.includes('castbuddy')) {
+              console.warn('Service Worker registration failed:', error);
+            }
+          });
+      });
+    }
+
+    // إظهار رسالة تثبيت التطبيق
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      
+      // إظهار زر التثبيت
+      const installButton = document.createElement('button');
+      installButton.textContent = '📱 تثبيت التطبيق';
+      installButton.style.cssText = 'position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #2563eb; color: white; padding: 0.75rem 1.5rem; border-radius: 0.5rem; box-shadow: 0 10px 15px rgba(0,0,0,0.2); z-index: 50; font-weight: 600; display: none;';
+      installButton.onclick = async () => {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          console.log(`User response to the install prompt: ${outcome}`);
+          deferredPrompt = null;
+          installButton.remove();
+        }
+      };
+      document.body.appendChild(installButton);
+      
+      // إظهار الزر بعد ثانيتين
+      setTimeout(() => {
+        if (deferredPrompt) {
+          installButton.style.display = 'block';
+        }
+      }, 2000);
+    });
+
+    // إخفاء زر التثبيت بعد التثبيت
+    window.addEventListener('appinstalled', () => {
+      console.log('PWA was installed');
+      deferredPrompt = null;
+      const installButton = document.querySelector('button[style*="bottom: 80px"]');
+      if (installButton) installButton.remove();
+    });
+  </script>
+
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2179731754865779"
+     crossorigin="anonymous"></script>
+<!-- اعلان افقي -->
+<ins class="adsbygoogle"
+     style="display:block"
+     data-ad-client="ca-pub-2179731754865779"
+     data-ad-slot="5501415404"
+     data-ad-format="auto"
+     data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+</body>
+</html>
+
+
