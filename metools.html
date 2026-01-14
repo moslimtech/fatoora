@@ -1541,6 +1541,29 @@
     </div>
   </div>
 
+  <!-- نافذة إدارة الفواتير -->
+  <div id="invoicesManagerModal" class="items-manager-modal">
+    <div class="items-manager-content" style="max-width: 800px;">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold">الفواتير المحفوظة</h2>
+        <button type="button" onclick="closeInvoicesManager()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+      </div>
+      
+      <!-- شريط البحث -->
+      <div class="mb-4 flex gap-2 flex-wrap">
+        <input type="text" id="invoiceSearchName" placeholder="البحث بالاسم..." class="flex-1 min-w-48 border rounded-lg p-2" oninput="filterInvoices()">
+        <input type="date" id="invoiceSearchDate" class="border rounded-lg p-2" onchange="filterInvoices()">
+        <button type="button" onclick="clearInvoiceSearch()" class="px-4 py-2 bg-gray-400 text-white rounded-lg">مسح</button>
+      </div>
+      
+      <div id="savedInvoicesList" class="mb-4 max-h-96 overflow-y-auto"></div>
+      
+      <div class="mt-4 text-center">
+        <button type="button" onclick="closeInvoicesManager()" class="px-4 py-2 bg-gray-500 text-white rounded-lg">إغلاق</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Service Worker Registration -->
   <script>
     if ('serviceWorker' in navigator) {
