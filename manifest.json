@@ -2,7 +2,7 @@
   "name": "فاتورة / عرض أسعار",
   "short_name": "فاتورة",
   "description": "تطبيق لإنشاء الفواتير وعروض الأسعار",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#3b82f6",

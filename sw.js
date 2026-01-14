@@ -1,8 +1,11 @@
 // Service Worker for PWA
 const CACHE_NAME = 'invoice-app-v1';
 const urlsToCache = [
-  '/',
-  '/metools.html',
+  './',
+  './metools.html',
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
   'https://cdn.tailwindcss.com',
   'https://cdn.jsdelivr.net/npm/sweetalert2@11',
   'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
